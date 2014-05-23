@@ -5,9 +5,13 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.hbase.HColumnDescriptor;
+import org.apache.hadoop.hbase.HTableDescriptor;
+import org.apache.hadoop.hbase.TableName;
+import org.apache.hadoop.hbase.client.HBaseAdmin;
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HConnectionManager;
-import org.apache.hadoop.hbase.client.HTableInterface;
 import org.apache.hadoop.hbase.client.Put;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -30,6 +34,8 @@ public class HbaseTraining {
     static Logger logger = LoggerFactory.getLogger(HbaseTraining.class);
     private HbaseUtil hbaseUtil;
     private HConnection hcon;
+    private static HBaseAdmin admin;
+
 
     /**
      * @param args
@@ -43,7 +49,73 @@ public class HbaseTraining {
         }else{
             switch(args[0]){
             case "multiThread":
+                if(args.length != 6)
                 //				tablePool = new HTablePool(hdfsUtil);
+                    logger.info("Usage:tableName inputPath threadNumber startIndex endIndex");
+                String inputPath = args[1];
+                String tableName = args[2];
+                int threadNumber = Integer.parseInt(args[3]);
+                int startIndex = Integer.parseInt(args[4]);
+                int endIndex = Integer.parseInt(args[5]);
+                int fileNumber = endIndex - startIndex;
+                HdfsUtil hdfsUtil = hbaseTraining.getHdfsUtil();
+                Path path = new Path(inputPath);
+                List<Path> fileList = hdfsUtil.getFileList(path);
+                for(Path file:fileList){
+                    logger.info("file in {}: {} ",inputPath,file.getName());
+                }
+                try {
+                    admin = new HBaseAdmin(hdfsUtil.getConf());
+                    if(!admin.tableExists(tableName)){
+                        HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName));
+                        descriptor.addFamily(new HColumnDescriptor("info"));
+                        admin.createTable(descriptor);
+                    }
+                    admin.close();
+                } catch (IOException e1) {
+                    // TODO Auto-generated catch block
+                    e1.printStackTrace();
+                } 
+
+                Thread[]  threadPool  =  new  Thread[threadNumber];
+                int  filesToBeRead  =  fileList.size()  -  startIndex;  //  剩余需要读取的文件数量  
+                while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
+                    if(filesToBeRead  <  threadNumber)  {  //  剩余文件数量小于线程数  
+                        for(int  i  =  0;  i  <  filesToBeRead;  i++){  //  为每个文件创建一个导入线程  
+                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
+                                    hbaseTraining.getHcon());  
+                        }  
+                        for(int  i  =  0;  i  <  filesToBeRead;  i++){  
+                            try {
+                                threadPool[i].join();
+                            } catch (InterruptedException e){
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }  //  等待子线程结束后后续代码方可继续执行  
+                        }
+                        startIndex +=filesToBeRead;
+                        fileNumber -= filesToBeRead;
+                        filesToBeRead -= filesToBeRead;
+                    }else{  //  剩余文件数量大于等于线程数  
+                        for  (int  i  =  0;  i  <  threadNumber;  i++){  //  为每个文件创建一个导入线程  
+                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
+                                    hbaseTraining.getHcon());  
+                        }  
+                        for(int  i  =  0;  i  <  threadNumber;  i++){  
+                            try {
+                                threadPool[i].join();
+                            }catch (InterruptedException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }  //  等待子线程结束后后续代码方可继续执行  
+                        }
+                        startIndex +=threadNumber;
+                        fileNumber -= threadNumber;
+                        filesToBeRead -= threadNumber;
+                    }
+                }
+                logger.info("multiThread: all jobs' done !");
+
                 break;
             case "test":
                 hbaseTraining.getHbaseUtil().addRecord("test", 111, "info",
@@ -62,7 +134,7 @@ public class HbaseTraining {
                 break;
             case "fileToTable":
                 if(args.length != 3){
-                    logger.warn("upload takes 2 arguments :tableNmae , filePath");
+                    logger.warn("upload takes 2 arguments :tableName , filePath");
                 }else{
                     BufferedReader fileBufferedReader = hbaseTraining.hdfsUtil.getFileBufferedReader(args[2]);
                     if(fileBufferedReader != null){
@@ -79,12 +151,24 @@ public class HbaseTraining {
                             int key = 0;
                             int count = 1;
                             boolean firstTime = true;
-                            ArrayList<Put> puts = null;
+                            String tableName1 = args[1];
+                            ArrayList<Put> puts = new ArrayList<Put>();
+                            try {
+                                admin = new HBaseAdmin(hbaseTraining.getHdfsUtil().getConf());
+                                if(!admin.tableExists(tableName1)){
+                                    HTableDescriptor descriptor = new HTableDescriptor(TableName.valueOf(tableName1));
+                                    descriptor.addFamily(new HColumnDescriptor("info"));
+                                    admin.createTable(descriptor);
+                                }
+                                admin.close();
+                            } catch (IOException e1) {
+                                // TODO Auto-generated catch block
+                                e1.printStackTrace();
+                            }
                             while((line = (fileBufferedReader.readLine())) != null){
-                                puts = new ArrayList<Put>();
                                 String[] split = line.split("\t");
                                 for(String v : split)vals.add(v);
-                                Put put = hbaseTraining.getHbaseUtil().addRecord(args[1], key, "info", cols, vals);
+                                Put put = hbaseTraining.getHbaseUtil().addRecord(tableName1, key, "info", cols, vals);
                                 puts.add(put);
                                 if(count >0 && count % 8196 == 0){
                                     if(firstTime){
@@ -93,7 +177,7 @@ public class HbaseTraining {
                                     }
                                     hbaseTraining.getHbaseUtil().getTable().put(puts);
                                     logger.info("{} records inserted to {}",count,args[1]);
-                                    puts = new ArrayList<Put>();
+                                    puts.clear();
                                 }
                                 count++;
                                 key++;
@@ -143,21 +227,6 @@ public class HbaseTraining {
             default:break;
             }
         }
-    }
-    
-    public void multiThreadTest(String[] args){
-        try {
-            HTableInterface table = hcon.getTable("test");
-            if(args.length<4){//程序使用方法提示
-                System.out.println("Usage:inputPath threadNumber poolSize startIndex endIndex");
-                System.exit(2);
-                }
-
-        } catch (IOException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-        
     }
 
     public HbaseUtil getHbaseUtil() {

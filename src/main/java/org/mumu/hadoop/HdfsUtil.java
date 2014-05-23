@@ -1,6 +1,5 @@
 package org.mumu.hadoop;
 import java.io.BufferedReader;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
@@ -12,6 +11,8 @@ import org.apache.hadoop.fs.FSDataInputStream;
 import org.apache.hadoop.fs.FileStatus;
 import org.apache.hadoop.fs.FileSystem;
 import org.apache.hadoop.fs.Path;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 /**
  * Hello world!
  *
@@ -19,6 +20,7 @@ import org.apache.hadoop.fs.Path;
 public class HdfsUtil 
 {
 	private static final String HDFS_URL = "hdfs://u1:9000";
+    static Logger logger = LoggerFactory.getLogger(HdfsUtil.class);
 
 	public HdfsUtil(){
 		super();
@@ -81,6 +83,14 @@ public class HdfsUtil
 		}
 	}
 	
+	public static void main(String args[]){
+	    HdfsUtil hdfsUtil = new HdfsUtil();
+	    Path path = new Path(args[1]);
+	    List<Path> fileList = hdfsUtil.getFileList(path);
+	    for(Path file:fileList){
+	        logger.info(file.getName());
+	    }
+	}
 	public List<Path> getFileList(Path path){
         ArrayList<Path> pathList = new ArrayList<Path>();
         try {
