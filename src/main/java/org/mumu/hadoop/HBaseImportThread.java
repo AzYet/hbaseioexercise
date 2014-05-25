@@ -11,7 +11,7 @@ import org.apache.hadoop.hbase.util.Bytes;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class HBaseImportThread extends Thread{
+public class HBaseImportThread implements Runnable{
         private HdfsUtil hdfsUtil;
         private  int  threadIndex;  //  线程索引  
         private  HConnection  hconn;  //  数据库连接池  
@@ -26,7 +26,6 @@ public class HBaseImportThread extends Thread{
             this.threadIndex  =  threadIndex;  //  保存线程索引  
             this.hconn  =  hconn;  //  保存表连接池  
             this.tableName = tableName;
-            start();  //  启动线程  
         }
 
         public  void  run()  {  
@@ -48,7 +47,7 @@ public class HBaseImportThread extends Thread{
                         //                    no unique
                         //                    byte[]  rowKey  =  new  byte[userID.length  +  time.length];  //  以userID+time构造rowkey  
                         //                    use whole line's hash value as key 
-                        byte[]  rowKey  =  Cypher.getMD5(parts).getBytes();    
+                        byte[]  rowKey  =  (parts[0]+" "+Cypher.getMD5(parts)).getBytes();    
                         //                    Bytes.putBytes(rowKey,  0,  userID,  0,  userID.length);  
                         //                    Bytes.putBytes(rowKey,  userID.length,  time,  0,  time.length);  
                         Put  put  =  new  Put(rowKey);  //  put数据  
