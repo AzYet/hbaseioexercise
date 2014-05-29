@@ -4,7 +4,7 @@
   <groupId>org.mumu.hadoop</groupId>
   <artifactId>HbaseIOExcercise</artifactId>
   <name>HbaseIOExcercise</name>
-  <version>1.0.0-FAITH</version>
+  <version>1.0-FAITH</version>
   <url>http://maven.apache.org</url>
   <build>
     <resources>

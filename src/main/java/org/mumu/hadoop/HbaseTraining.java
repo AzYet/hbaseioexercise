@@ -4,9 +4,6 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Executors;
-import java.util.concurrent.locks.Condition;
-import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -21,21 +18,9 @@ import org.slf4j.LoggerFactory;
 
 public class HbaseTraining {
 
-
-
-    private HdfsUtil hdfsUtil;
-    static Logger logger = LoggerFactory.getLogger(HbaseTraining.class);
-    private HbaseUtil hbaseUtil;
-    private HConnection hcon;
-    private static HBaseAdmin admin;
-    ReentrantLock lock ;
-    private Condition condition;    
-
     public HbaseTraining(){
         super();
         hdfsUtil = new HdfsUtil();
-        lock = new ReentrantLock();
-        condition = lock.newCondition();
         setHbaseUtil(new HbaseUtil());
         try {
             hcon = HConnectionManager.createConnection(hdfsUtil.getConf());
@@ -44,6 +29,14 @@ public class HbaseTraining {
             e.printStackTrace();
         }
     }
+
+    private HdfsUtil hdfsUtil;
+    static Logger logger = LoggerFactory.getLogger(HbaseTraining.class);
+    private HbaseUtil hbaseUtil;
+    private HConnection hcon;
+    private static HBaseAdmin admin;
+
+
     /**
      * @param args
      * @throws IOException 
@@ -83,74 +76,43 @@ public class HbaseTraining {
                     // TODO Auto-generated catch block
                     e1.printStackTrace();
                 } 
-                java.util.concurrent.ExecutorService executor = Executors.newFixedThreadPool(threadNumber);
+
                 Thread[]  threadPool  =  new  Thread[threadNumber];
                 int  filesToBeRead  =  fileList.size()  -  startIndex;  //  剩余需要读取的文件数量  
                 while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
                     if(filesToBeRead  <  threadNumber)  {  //  剩余文件数量小于线程数  
                         for(int  i  =  0;  i  <  filesToBeRead;  i++){  //  为每个文件创建一个导入线程  
-                            executor.execute( new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
-                                    hbaseTraining.getHcon()));
-                            startIndex ++;
-                            fileNumber --;
-                            filesToBeRead --;
+                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
+                                    hbaseTraining.getHcon());  
+                        }  
+                        for(int  i  =  0;  i  <  filesToBeRead;  i++){  
+                            try {
+                                threadPool[i].join();
+                            } catch (InterruptedException e){
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }  //  等待子线程结束后后续代码方可继续执行  
                         }
-//                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
-//                                    hbaseTraining.getHcon());  
-//                        }  
-//                        for(int  i  =  0;  i  <  filesToBeRead;  i++){  
-//                            try {
-//                                threadPool[i].join();
-//                            } catch (InterruptedException e){
-//                                // TODO Auto-generated catch block
-//                                e.printStackTrace();
-//                            }  //  等待子线程结束后后续代码方可继续执行  
-//                        }
-//                        startIndex +=filesToBeRead;
-//                        fileNumber -= filesToBeRead;
-//                        filesToBeRead -= filesToBeRead;
+                        startIndex +=filesToBeRead;
+                        fileNumber -= filesToBeRead;
+                        filesToBeRead -= filesToBeRead;
                     }else{  //  剩余文件数量大于等于线程数  
                         for  (int  i  =  0;  i  <  threadNumber;  i++){  //  为每个文件创建一个导入线程  
-                            executor.execute( new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
-                                    hbaseTraining.getHcon()));
-                            startIndex ++;
-                            fileNumber --;
-                            filesToBeRead --;
-                        }
-//                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
-//                                    hbaseTraining.getHcon());  
-//                        }  
-//                        for(int  i  =  0;  i  <  threadNumber;  i++){  
-//                            try {
-//                                threadPool[i].join();
-//                            }catch (InterruptedException e) {
-//                                // TODO Auto-generated catch block
-//               p[ko                  e.printStackTrace();
-//                            }  //  等待子线程结束后后续代码方可继续执行  
-//                        }
-//                        startIndex +=threadNumber;
-//                        fileNumber -= threadNumber;
-//                        filesToBeRead -= threadNumber;
-                    }
-                    hbaseTraining.lock.lock();
-                    try {
-                        while(filesToBeRead > 0 ){
-                            logger.info("start to awit for available threads");
-                            hbaseTraining.condition.await();
-                            executor.execute( new  HBaseImportThread(tableName, startIndex,  inputPath + "/"+fileList.get(startIndex).getName(),    
-                                    hbaseTraining.getHcon()));
-                            startIndex ++;
-                            fileNumber --;
-                            filesToBeRead --;
+                            threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
+                                    hbaseTraining.getHcon());  
                         }  
-
-                    } catch (InterruptedException e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }finally{
-                        hbaseTraining.lock.unlock();
+                        for(int  i  =  0;  i  <  threadNumber;  i++){  
+                            try {
+                                threadPool[i].join();
+                            }catch (InterruptedException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                            }  //  等待子线程结束后后续代码方可继续执行  
+                        }
+                        startIndex +=threadNumber;
+                        fileNumber -= threadNumber;
+                        filesToBeRead -= threadNumber;
                     }
-                    executor.shutdown();
                 }
                 logger.info("multiThread: all jobs' done !");
 
