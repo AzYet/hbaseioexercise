@@ -3,6 +3,9 @@ package org.mumu.hadoop;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.hadoop.hbase.client.HConnection;
 import org.apache.hadoop.hbase.client.HTableInterface;
@@ -12,15 +15,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 public class HBaseImportThread extends Thread{
+        private Condition condition;
+        public HBaseImportThread() {
+        super();
+        condition = lock.newCondition();
+    }
+
         private HdfsUtil hdfsUtil;
         private  int  threadIndex;  //  线程索引  
         private  HConnection  hconn;  //  数据库连接池  
         private  HTableInterface  table;  //  表对象  
         private BufferedReader reader;
         private String tableName;
+        private Lock lock = new ReentrantLock();
+       
         static Logger logger = LoggerFactory.getLogger(HBaseImportThread.class);
         public  HBaseImportThread(String tableName, int  threadIndex,  String  fileName,  HConnection  hconn)  {  
-            logger.info("Thread  index  is  "  +  threadIndex  +  ".  File  name  is  "  +  fileName);  
+//            logger.info("Thread  index  is  "  +  threadIndex  +  ".  File  name  is  "  +  fileName);  
             hdfsUtil = new HdfsUtil();
             this.reader  =  hdfsUtil.getFileBufferedReader(fileName);  
             this.threadIndex  =  threadIndex;  //  保存线程索引  
@@ -31,11 +42,8 @@ public class HBaseImportThread extends Thread{
 
         public  void  run()  {  
             try {
-                table  =  hconn.getTable(tableName);
-                //  开启表  
-                //            table.setAutoFlush(false);  //  deprecated method   
-                table.setAutoFlushTo(false);  //  禁用自动提交  
                 String line;
+                ArrayList<Put> puts = new ArrayList<Put>();
                 while  ((line = reader.readLine()) != null)  {  //  逐行读取数据文件  
                     String[]  columnList = 
                             new String[]{"time","userID","serverIP","hostName","spName","uploadTraffic","downloadTraffic"};
@@ -56,13 +64,21 @@ public class HBaseImportThread extends Thread{
                         for(String colName:columnList){
                             put.add("info".getBytes(),  colName.getBytes(),  parts[i++].getBytes());  
                         }
-                        table.put(put);
+                        puts.add(put);
                     }else {
                        logger.info("thread index {}: bad line : {}",threadIndex,line);
                     }
                 }
+                lock.lock();
+                logger.info(Thread.currentThread().getName() + " starts to write table...");  
+                table  =  hconn.getTable(tableName);
+                //  开启表  
+                //            table.setAutoFlush(false);  //  deprecated method   
+                table.setAutoFlushTo(false);  //  禁用自动提交  
+                table.put(puts);
                 table.flushCommits();
                 table.close();
+                lock.unlock();
             } catch (IOException e1) {
                 // TODO Auto-generated catch block
                 e1.printStackTrace();
