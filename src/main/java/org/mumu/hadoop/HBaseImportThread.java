@@ -15,7 +15,6 @@ public class HBaseImportThread extends Thread{
         public HBaseImportThread() {
         super();
     }
-
         private HdfsUtil hdfsUtil;
         private  int  threadIndex;  //  线程索引  
         private  HConnection  hconn;  //  数据库连接池  
@@ -31,6 +30,7 @@ public class HBaseImportThread extends Thread{
             this.threadIndex  =  threadIndex;  //  保存线程索引  
             this.hconn  =  hconn;  //  保存表连接池  
             this.tableName = tableName;
+            start();  //  启动线程  
         }
 
         public  void  run()  {  

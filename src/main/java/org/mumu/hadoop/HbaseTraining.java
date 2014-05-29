@@ -81,6 +81,9 @@ public class HbaseTraining {
 
                 HBaseImportThread[]  threadPool  =  new  HBaseImportThread[fileNumber];
                 /*while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
+                Thread[]  threadPool  =  new  Thread[threadNumber];
+                int  filesToBeRead  =  fileList.size()  -  startIndex;  //  剩余需要读取的文件数量  
+                while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
                     if(filesToBeRead  <  threadNumber)  {  //  剩余文件数量小于线程数  
                         for(int  i  =  0;  i  <  filesToBeRead;  i++){  //  为每个文件创建一个导入线程  
                             threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
