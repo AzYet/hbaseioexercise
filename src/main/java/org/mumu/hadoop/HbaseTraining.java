@@ -4,6 +4,8 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.hbase.HColumnDescriptor;
@@ -77,9 +79,8 @@ public class HbaseTraining {
                     e1.printStackTrace();
                 } 
 
-                Thread[]  threadPool  =  new  Thread[threadNumber];
-                int  filesToBeRead  =  fileList.size()  -  startIndex;  //  剩余需要读取的文件数量  
-                while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
+                HBaseImportThread[]  threadPool  =  new  HBaseImportThread[fileNumber];
+                /*while  (fileNumber  >  0  &&  filesToBeRead  >  0)  {  
                     if(filesToBeRead  <  threadNumber)  {  //  剩余文件数量小于线程数  
                         for(int  i  =  0;  i  <  filesToBeRead;  i++){  //  为每个文件创建一个导入线程  
                             threadPool[i]  =  new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(startIndex  +  i).getName(),    
@@ -113,12 +114,21 @@ public class HbaseTraining {
                         fileNumber -= threadNumber;
                         filesToBeRead -= threadNumber;
                     }
+                }*/
+                ExecutorService executorService = Executors.newFixedThreadPool(threadNumber);
+                for(int i = 0 ; i <fileNumber ; i ++){
+                	threadPool[i] = new  HBaseImportThread(tableName, i,  inputPath + "/"+fileList.get(i).getName(),    
+                			hbaseTraining.getHcon());
                 }
+                for(HBaseImportThread thread:threadPool){
+                    executorService.execute(thread);
+                }
+                executorService.shutdown();
                 logger.info("multiThread: all jobs' done !");
 
                 break;
             case "test":
-                hbaseTraining.getHbaseUtil().addRecord("test", 111, "info",
+                /*hbaseTraining.getHbaseUtil().addRecord("test", 111, "info",
                         new ArrayList<String>(){
                     private static final long serialVersionUID = 1L;
                     {
@@ -130,7 +140,17 @@ public class HbaseTraining {
                         {
                             add("q1");
                             add("q2");
-                        }});
+                        }});*/
+            	try {
+//					hbaseTraining.getHbaseUtil().selectByRowKey(args[1], args[2]);
+            		ArrayList<String> list = new ArrayList<String>();
+            		list.add("info,userID,8412672a");
+            		hbaseTraining.getHbaseUtil().selectByFilter("test", list);
+            		
+				} catch (IOException e2) {
+					// TODO Auto-generated catch block
+					e2.printStackTrace();
+				}
                 break;
             case "fileToTable":
                 if(args.length != 3){
@@ -144,9 +164,11 @@ public class HbaseTraining {
                             String firstLine = fileBufferedReader.readLine();
                             List<String> cols = new ArrayList<String>();
                             List<String> vals = new ArrayList<String>();
+                            String[] colArray =new String[]{"time","userID","serverIP","hostName","spName","uploadTraffic","downloadTraffic"};
                             if(firstLine != null){
                                 String[] split = firstLine.split("\t");
-                                for(String c : split)cols.add(c); 
+                                logger.info("first line split into {} parts ", split.length);
+                                for(String c : colArray)cols.add(c); 
                             }
                             int key = 0;
                             int count = 1;
@@ -167,6 +189,10 @@ public class HbaseTraining {
                             }
                             while((line = (fileBufferedReader.readLine())) != null){
                                 String[] split = line.split("\t");
+                                if(split.length != colArray.length){
+                                	logger.info("bad split length {}, abort!",split.length);
+                                	break;
+                                }
                                 for(String v : split)vals.add(v);
                                 Put put = hbaseTraining.getHbaseUtil().addRecord(tableName1, key, "info", cols, vals);
                                 puts.add(put);
