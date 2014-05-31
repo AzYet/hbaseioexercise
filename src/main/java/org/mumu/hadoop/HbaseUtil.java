@@ -54,7 +54,12 @@ public class HbaseUtil {
         Get g = new Get(Bytes.toBytes(rowKey));  
         Result r=table.get(g);  
         List<Cell> cells = r.listCells();
-        for(Cell cell:cells){
+        for(KeyValue kv : r.raw()){
+            System.out.println("column: "+new String(kv.getFamily()) +",qualifier: "+new String(kv.getQualifier()));  
+            System.out.println("value: "+new String(kv.getValue()));  
+        }
+
+        /*for(Cell cell:cells){
         	byte[] familyArray = cell.getFamilyArray();
         	int familyOffset = cell.getFamilyOffset();
         	byte familyLength = cell.getFamilyLength();
@@ -76,7 +81,7 @@ public class HbaseUtil {
             logger.info("column: "+new String(familyBytes));  
             logger.info("qualifier: "+new String(qualifierBytes));  
             logger.info("value: "+new String(valueArray));  
-        }
+        }*/
     }  
 	
 	public void selectByFilter(String tablename,List<String> arr) throws IOException{  
@@ -94,14 +99,15 @@ public class HbaseUtil {
 //          s1.addColumn(Bytes.toBytes(s[0]), Bytes.toBytes(s[1]));  
         }  
         s1.setFilter(filterList);  
-        ResultScanner ResultScannerFilterList = table.getScanner(s1);  
-        for(Result rr=ResultScannerFilterList.next();rr!=null;rr=ResultScannerFilterList.next()){  
+        ResultScanner resultScannerFilterList = table.getScanner(s1);  
+        for(Result rr=resultScannerFilterList.next();rr!=null;rr=resultScannerFilterList.next()){  
             for(KeyValue kv:rr.list()){  
-                System.out.println("row : "+new String(kv.getRow()));  
-//                System.out.println("column : "+new String(kv.getColumn()));  
-                System.out.println("value : "+new String(kv.getValue()));  
+                System.out.println("column: "+new String(kv.getFamily()) +",qualifier: "+new String(kv.getQualifier()));  
+                System.out.println("value: "+new String(kv.getValue()));  
             }  
-            List<Cell> cells = rr.listCells();
+            
+            System.out.println("total "+rr.size()+" records.");  
+            /*List<Cell> cells = rr.listCells();
             for(Cell cell:cells){
             	byte[] familyArray = cell.getFamilyArray();
             	int familyOffset = cell.getFamilyOffset();
@@ -124,7 +130,18 @@ public class HbaseUtil {
                 logger.info("column: "+new String(familyBytes));  
                 logger.info("qualifier: "+new String(qualifierBytes));  
                 logger.info("value: "+new String(valueArray));  
-            }
+            }*/
+        }  
+    }  
+	
+	public void selectByRowKeyColumn(String tablename,String rowKey,String column, String qualifier) throws IOException{  
+        HTable table=new HTable(hbaseConf,tablename);  
+        Get g = new Get(Bytes.toBytes(rowKey));  
+        g.addColumn(Bytes.toBytes(column), Bytes.toBytes(qualifier));  
+        Result r=table.get(g);  
+        for(KeyValue kv:r.raw()){  
+            System.out.println("column: "+new String(kv.getFamily()) +",qualifier: "+new String(kv.getQualifier()));  
+            System.out.println("value: "+new String(kv.getValue()));  
         }  
     }  
 	

@@ -54,7 +54,7 @@ public class HBaseImportThread extends Thread{
                         //                    no unique
                         //                    byte[]  rowKey  =  new  byte[userID.length  +  time.length];  //  以userID+time构造rowkey  
                         //                    use whole line's hash value as key 
-                        byte[]  rowKey  =  (parts[0]+"-"+parts[1]+"-"+Cypher.getMD5(parts)).getBytes();    
+                        byte[]  rowKey  =  (/*parts[0]+"-"+parts[1]+"-"+*/Cypher.getMD5(parts)).getBytes();    
                         //                    Bytes.putBytes(rowKey,  0,  userID,  0,  userID.length);  
                         //                    Bytes.putBytes(rowKey,  userID.length,  time,  0,  time.length);  
                         Put  put  =  new  Put(rowKey);  //  put数据  
